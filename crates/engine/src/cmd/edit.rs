@@ -988,6 +988,39 @@ fn batch_rename(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"names": names.iter().map(|(i, n)| json!({"id": i, "name": n})).collect::<Vec<_>>()}))
 }
 
+/// Non-overlapping, left-to-right char ranges of `hay` that match `lower_find` (an already
+/// lowercased query) ignoring letter case; the same search the Find hit test uses.
+fn find_spans_ci(hay: &str, lower_find: &str) -> Vec<(usize, usize)> {
+    let needle: Vec<char> = lower_find.chars().collect();
+    let mut folded: Vec<(char, usize)> = Vec::new();
+    let mut total = 0;
+    for (i, c) in hay.chars().enumerate() {
+        folded.extend(c.to_lowercase().map(|l| (l, i)));
+        total = i + 1;
+    }
+    let mut spans = Vec::new();
+    if needle.is_empty() {
+        return spans;
+    }
+    let mut k = 0;
+    while k + needle.len() <= folded.len() {
+        let window = folded.get(k..k + needle.len()).unwrap_or_default();
+        let starts_char = k == 0 || folded.get(k - 1).map(|x| x.1) != folded.get(k).map(|x| x.1);
+        if starts_char && window.iter().map(|x| x.0).eq(needle.iter().copied()) {
+            let start = folded.get(k).map_or(total, |x| x.1);
+            let end = folded.get(k + needle.len()).map_or(total, |x| x.1);
+            let last_start = folded.get(k + needle.len() - 1).map_or(total, |x| x.1);
+            if end > last_start {
+                spans.push((start, end));
+                k += needle.len();
+                continue;
+            }
+        }
+        k += 1;
+    }
+    spans
+}
+
 fn find_replace(s: &mut Session, p: &Value) -> Result<Value> {
     let find = req_string("edit.findReplace", p, "find")?;
     if find.is_empty() {
@@ -1010,26 +1043,24 @@ fn find_replace(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some(r) = &replace {
             let n = doc.get_mut(i)?;
             if names && name_hit {
-                n.name = n.name.replace(find.as_str(), r);
+                let chars: Vec<char> = n.name.chars().collect();
+                let mut out = String::new();
+                let mut last = 0;
+                for (start, end) in find_spans_ci(&n.name, &lower) {
+                    out.extend(chars.get(last..start).unwrap_or_default());
+                    out.push_str(r);
+                    last = end;
+                }
+                out.extend(chars.get(last..).unwrap_or_default());
+                n.name = out;
             }
             if let NodeKind::Text(t) = &mut n.kind {
-                // Replace occurrence by occurrence so styles shift correctly.
-                // The search resumes after each inserted replacement, so a replacement that
-                // contains `find` neither loops forever nor stops the other occurrences.
-                let mut guard = 0;
-                let mut cursor = 0;
-                let len = find.chars().count();
-                let r_len = r.chars().count();
-                loop {
-                    let from = t.characters.char_indices().nth(cursor).map_or(t.characters.len(), |(b, _)| b);
-                    let Some(pos) = t.characters.get(from..).and_then(|tail| tail.find(find.as_str())) else { break };
-                    let start = cursor + t.characters.get(from..from + pos).map_or(0, |x| x.chars().count());
-                    t.replace_range(start, start + len, r);
-                    cursor = start + r_len;
-                    guard += 1;
-                    if guard > 10_000 {
-                        break;
-                    }
+                // Replace occurrence by occurrence (last to first, so earlier offsets stay valid
+                // and styles shift correctly). Spans come from the same case-insensitive search
+                // as the hit test, and are computed before any replacement is inserted, so a
+                // replacement that contains `find` neither loops forever nor hides other matches.
+                for (start, end) in find_spans_ci(&t.characters, &lower).into_iter().rev().take(10_000) {
+                    t.replace_range(start, end, r);
                 }
             }
         }
