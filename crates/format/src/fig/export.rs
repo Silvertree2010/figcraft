@@ -26,9 +26,9 @@ use figcraft_doc::proto::{
 };
 use figcraft_doc::{
     AutoLayout, BoolOp, ContentAlign, CrossAlign, Document, EffectKind, ExportSize, GridAlign, GridKind, HConstraint, LayoutMode, LetterSpacing,
-    LineHeight, ListStyle, MainAlign, MaskType, Node, NodeId, NodeKind, NoiseMode, PropDef, Sizing, StrokeAlign, StrokeCap, StrokeJoin, StyleKind,
-    TextAlignH, TextAlignV, TextAutoResize, TextCase, TextData, TextDecoration, TextStyle, VConstraint, VariableType, VariableValue, VectorNetwork,
-    WindingRule,
+    LineHeight, ListStyle, MainAlign, MaskType, Node, NodeId, NodeKind, NoiseMode, ParaList, PropDef, Sizing, StrokeAlign, StrokeCap, StrokeJoin,
+    StyleKind, TextAlignH, TextAlignV, TextAutoResize, TextCase, TextData, TextDecoration, TextStyle, VConstraint, VariableType, VariableValue,
+    VectorNetwork, WindingRule,
 };
 use serde_json::Value;
 
@@ -1564,7 +1564,8 @@ impl<'d> Exporter<'d> {
                 .collect();
             data.extend([("characterStyleIDs", arr(ids)), ("styleOverrideTable", arr(entries))]);
         }
-        let lists: Vec<ListStyle> = (0..td.paragraph_count()).map(|p| td.para_list(p).list).collect();
+        let paras: Vec<ParaList> = (0..td.paragraph_count()).map(|p| td.para_list(p)).collect();
+        let lists: Vec<ListStyle> = paras.iter().map(|p| p.list).collect();
         // One entry per paragraph, each with every field a reader expects.
         let line = |(i, l): (usize, &ListStyle)| {
             let ty = match l {
@@ -1579,7 +1580,7 @@ impl<'d> Exporter<'d> {
                 ("styleId", int(0)),
                 ("indentationLevel", int(i64::from(listed))),
                 ("sourceDirectionality", e("AUTO")),
-                ("listStartOffset", int(0)),
+                ("listStartOffset", int(paras.get(i).map_or(0, |p| i64::from(p.start_offset)))),
                 ("isFirstLineOfList", b(first)),
             ])
         };

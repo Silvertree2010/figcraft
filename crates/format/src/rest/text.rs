@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use figcraft_doc::{
-    DecorationLength, DecorationStyle, LetterSpacing, LineHeight, ListStyle, ParaList, StyleRun, TextAlignH, TextAlignV, TextAutoResize, TextCase,
-    TextData, TextDecoration, TextStyle,
+    DecorationLength, DecorationStyle, LetterSpacing, LineHeight, ListStyle, MAX_LIST_START_OFFSET, ParaList, StyleRun, TextAlignH, TextAlignV,
+    TextAutoResize, TextCase, TextData, TextDecoration, TextStyle,
 };
 use serde_json::Value;
 
@@ -210,10 +210,12 @@ fn runs(cx: &mut Ctx, v: &Value, td: &TextData) -> Vec<StyleRun> {
     out
 }
 
-/// Each paragraph's list type and nesting level from `lineTypes` and `lineIndentations`.
+/// Each paragraph's list type, nesting level and start from `lineTypes`, `lineIndentations` and
+/// `listStartOffsets` (the last from `.fig` files only).
 fn lists(v: &Value, td: &mut TextData) {
     let types = list(v, "lineTypes");
     let indents = list(v, "lineIndentations");
+    let offsets = list(v, "listStartOffsets");
     td.paragraphs = types
         .iter()
         .enumerate()
@@ -224,6 +226,11 @@ fn lists(v: &Value, td: &mut TextData) {
                 _ => ListStyle::None,
             },
             indent: indents.get(i).and_then(Value::as_f64).filter(|d| d.is_finite()).map_or(0, |d| d.clamp(0.0, 255.0) as u8),
+            start_offset: offsets
+                .get(i)
+                .and_then(Value::as_f64)
+                .filter(|n| n.is_finite())
+                .map_or(0, |n| n.clamp(0.0, f64::from(MAX_LIST_START_OFFSET)) as u32),
         })
         .collect();
     // Clamp the levels and fold one style for all back into the layer's list style.

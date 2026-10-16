@@ -117,7 +117,7 @@ fn list_keys_at_list_items() {
     for (chars, before, caret, k, shift, after, want, why) in cases {
         let mut s = Session::new();
         let t = text(&mut s, chars);
-        let ps: Vec<ParaList> = before.iter().map(|(list, indent)| ParaList { list: *list, indent: *indent }).collect();
+        let ps: Vec<ParaList> = before.iter().map(|(list, indent)| ParaList { list: *list, indent: *indent, ..ParaList::default() }).collect();
         if let figcraft_doc::NodeKind::Text(td) = &mut s.doc_mut().unwrap().get_mut(t).unwrap().kind {
             td.paragraphs = ps;
         }
@@ -141,7 +141,8 @@ fn paragraph_lists_follow_edits() {
     // A paragraph's list stays with it as text is typed, pasted and deleted: new paragraphs copy
     // the one they split from; joined paragraphs keep the first one's.
     let mut t = TextData::new("ab\ncd\nef");
-    t.paragraphs = vec![ParaList { list: B, indent: 1 }, ParaList::default(), ParaList { list: N, indent: 0 }];
+    t.paragraphs =
+        vec![ParaList { list: B, indent: 1, ..ParaList::default() }, ParaList::default(), ParaList { list: N, indent: 0, ..ParaList::default() }];
     let get = |t: &TextData| (0..t.paragraph_count()).map(|p| (t.para_list(p).list, t.para_list(p).indent)).collect::<Vec<_>>();
     t.replace_range(1, 1, "x\ny");
     assert_eq!(get(&t), [(B, 1), (B, 1), (P, 0), (N, 0)], "a pasted newline: a new item like it");
@@ -156,7 +157,7 @@ fn paragraph_lists_follow_edits() {
         (seed >> 33) as usize % n.max(1)
     };
     let mut t = TextData::new("a\nb\nc\nd");
-    t.paragraphs = vec![ParaList { list: B, indent: 2 }; 4];
+    t.paragraphs = vec![ParaList { list: B, indent: 2, ..ParaList::default() }; 4];
     for _ in 0..500 {
         let n = t.char_count();
         let (a, b) = (rnd(n + 2), rnd(n + 2));

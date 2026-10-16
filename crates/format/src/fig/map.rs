@@ -9,6 +9,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use figcraft_doc::MAX_LIST_START_OFFSET;
 use figcraft_doc::geom::{Affine, Point};
 use figcraft_doc::proto::{MAX_ACTION_DEPTH, MAX_EXPR_DEPTH};
 use serde_json::{Map, Value, json};
@@ -840,6 +841,21 @@ impl<'a> Mapper<'a> {
             .collect();
         if lines.iter().any(|l| *l != "NONE") {
             o.insert("lineTypes".into(), json!(lines));
+        }
+        // An ordered list can start past 1 (an item typed as "2)" shows "2.").
+        let offsets: Vec<u32> = td
+            .get("lines")
+            .map(Kv::list)
+            .unwrap_or_default()
+            .iter()
+            .map(|l| {
+                let ordered = l.get("lineType").and_then(Kv::str) == Some("ORDERED_LIST");
+                let n = l.get("listStartOffset").and_then(Kv::f64).filter(|n| ordered && n.is_finite()).unwrap_or(0.0);
+                n.clamp(0.0, f64::from(MAX_LIST_START_OFFSET)) as u32
+            })
+            .collect();
+        if offsets.iter().any(|n| *n != 0) {
+            o.insert("listStartOffsets".into(), json!(offsets));
         }
     }
 

@@ -33,6 +33,7 @@ enum NavigationType NAVIGATE OVERLAY
 enum TransitionType INSTANT_TRANSITION DISSOLVE SMART_ANIMATE
 enum EasingType IN_CUBIC OUT_CUBIC
 enum ConstraintType MIN CENTER MAX STRETCH SCALE
+enum LineType PLAIN ORDERED_LIST UNORDERED_LIST
 struct GUID uint sessionID, uint localID
 struct Color float r, float g, float b, float a
 struct Vector float x, float y
@@ -53,7 +54,8 @@ message VariableData AnyValue value, DataType dataType
 message Paint PaintType type, Color color, float opacity, bool visible, Image image, Matrix transform, ColorStop[] stops, VariableData colorVar
 message ParentIndex GUID guid, string position
 message FontName string family, string style, string postscript
-message TextData string characters, uint[] characterStyleIDs, NodeChange[] styleOverrideTable
+message TextLineData LineType lineType, int indentationLevel, int listStartOffset, bool isFirstLineOfList
+message TextData string characters, uint[] characterStyleIDs, NodeChange[] styleOverrideTable, TextLineData[] lines
 message Path WindingRule windingRule, uint commandsBlob
 message GUIDPath GUID[] guids
 message SymbolData GUID symbolID, NodeChange[] symbolOverrides
@@ -665,6 +667,33 @@ fn instances_inside_their_own_main_stop() {
     let doc_nodes = vec![node(0, None, "DOCUMENT", "D", vec![]), node(1, Some((0, "!")), "CANVAS", "P", vec![]), sym, inner];
     let (doc, _) = import(&canvas(&schema(), &o(vec![("nodeChanges", arr(doc_nodes))])), "x").unwrap();
     assert!(doc.nodes().any(|n| n.name == "Self"));
+}
+
+/// A list item Figma shows as "2." (typed as "2)") is stored as an ordered line whose list
+/// starts one past 1: the import keeps that start, and an export and import round trip too.
+#[test]
+fn ordered_list_start_offset_survives_import() {
+    let line = o(vec![
+        ("lineType", e("ORDERED_LIST")),
+        ("indentationLevel", Kv::Int(1)),
+        ("listStartOffset", Kv::Int(1)),
+        ("isFirstLineOfList", Kv::Bool(true)),
+    ]);
+    let text = o(vec![("characters", s("Next try this")), ("lines", arr(vec![line]))]);
+    let doc_nodes = vec![
+        node(0, None, "DOCUMENT", "D", vec![]),
+        node(1, Some((0, "!")), "CANVAS", "P", vec![]),
+        node(2, Some((1, "!")), "TEXT", "Item", vec![("size", xy(100.0, 20.0)), ("textData", text)]),
+    ];
+    let (doc, _) = import(&canvas(&schema(), &o(vec![("nodeChanges", arr(doc_nodes))])), "x").unwrap();
+    let start = |doc: &figcraft_doc::Document| {
+        let NodeKind::Text(t) = &named(doc, "Item").kind else { panic!("not text") };
+        let pl = serde_json::to_value(t.para_list(0)).unwrap();
+        (pl["list"].clone(), pl["startOffset"].clone())
+    };
+    assert_eq!(start(&doc), (Value::from("numbered"), Value::from(1)));
+    let (again, _) = import(&export(&doc, None).unwrap().0, "x").unwrap();
+    assert_eq!(start(&again), (Value::from("numbered"), Value::from(1)));
 }
 
 /// A collection from a library is named by its asset key, not a guid — also in the explicit mode

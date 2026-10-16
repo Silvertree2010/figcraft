@@ -43,7 +43,7 @@ fn starts(l: &TextLayout) -> Vec<(f64, Option<f64>)> {
 }
 
 fn pl(list: ListStyle, indent: u8) -> ParaList {
-    ParaList { list, indent }
+    ParaList { list, indent, ..ParaList::default() }
 }
 
 #[test]
@@ -77,6 +77,10 @@ fn list_numbering_by_level() {
         assert_eq!(list_markers(&lists), want, "{why}");
     }
     assert_eq!(list_markers(&many).last().map(String::as_str), Some("aa."), "silent: letters go on past z as aa");
+    // A list stored as starting one past 1 (an item typed as "2)") counts on from 2; only the item
+    // starting a count uses its offset.
+    let from2 = ParaList { start_offset: 1, ..pl(N, 0) };
+    assert_eq!(list_markers(&[from2, from2, pl(P, 0), from2]), ["2.", "3.", "", "2."]);
 }
 
 #[test]

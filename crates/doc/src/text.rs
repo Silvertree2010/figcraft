@@ -208,13 +208,24 @@ pub enum ListStyle {
 /// Deepest list nesting (levels 0..=MAX_LIST_INDENT).
 pub const MAX_LIST_INDENT: u8 = 8;
 
+/// Largest list start offset kept (a list can start at most this far past 1).
+pub const MAX_LIST_START_OFFSET: u32 = 1_000_000;
+
 /// One paragraph's list settings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ParaList {
     pub list: ListStyle,
     /// Nesting level (0 = outermost; plain paragraphs are always 0).
     pub indent: u8,
+    /// How far past 1 a list starting at this item counts from (0: from 1; plain paragraphs are
+    /// always 0). Only the item that starts a count uses it.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub start_offset: u32,
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 /// Character style. In runs, every field is an override; `None` means "inherit the base".
@@ -637,13 +648,13 @@ impl TextData {
 
     /// Paragraph `p`'s list settings.
     pub fn para_list(&self, p: usize) -> ParaList {
-        self.paragraphs.get(p).copied().unwrap_or(ParaList { list: self.list, indent: 0 })
+        self.paragraphs.get(p).copied().unwrap_or(ParaList { list: self.list, ..ParaList::default() })
     }
 
     /// Spell out every paragraph's list settings in `paragraphs` (and drop extra entries).
     fn fill_paragraphs(&mut self) {
         let n = self.paragraph_count();
-        let fill = ParaList { list: self.list, indent: 0 };
+        let fill = ParaList { list: self.list, ..ParaList::default() };
         self.paragraphs.resize(n, fill);
     }
 
@@ -665,9 +676,13 @@ impl TextData {
         for pl in self.paragraphs.get_mut(a..=b).unwrap_or(&mut []) {
             f(pl);
             pl.indent = if pl.list == ListStyle::None { 0 } else { pl.indent.min(MAX_LIST_INDENT) };
+            if pl.list == ListStyle::None {
+                pl.start_offset = 0;
+            }
         }
         if let Some(first) = self.paragraphs.first().copied()
             && first.indent == 0
+            && first.start_offset == 0
             && self.paragraphs.iter().all(|p| *p == first)
         {
             self.list = first.list;
