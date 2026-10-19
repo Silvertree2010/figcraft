@@ -225,6 +225,12 @@ pub fn run_binding(app: &mut FigApp, id: &str) {
         "edit.delete" if app.session.tool.pen.is_some() => {
             let _ = app.session.pen_finish();
         }
+        // A page picked in the Pages list with no layer selected: Delete removes the page.
+        "edit.delete" if app.ui.layers_focus && app.session.selection().is_empty() => {
+            if let Ok(page) = app.session.page() {
+                app.run("page.delete", json!({"id": page}));
+            }
+        }
         // Enter with a shape or frame tool chosen places one in the middle of the view.
         "select.children" if app.session.tool.tool.draws_shape() => {
             app.run("tool.place", json!({}));

@@ -307,6 +307,9 @@ fn pages(app: &mut FigApp, ui: &mut Ui) {
     {
         app.run("page.select", json!({"id": p}));
     }
+    if select.is_some() {
+        app.ui.layers_focus = true;
+    }
     // `inner_rect` is the room the list was given; a short list shrinks to its rows.
     pages_edge(app, ui, moved.inner_rect.height().min(moved.content_size.y));
 }

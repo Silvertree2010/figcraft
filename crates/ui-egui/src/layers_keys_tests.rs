@@ -107,3 +107,17 @@ fn a_canvas_press_gives_arrows_back_to_nudging() {
     let doc = u.app.session.doc().unwrap();
     assert_eq!(doc.node(c).unwrap().transform.translation().x, 201.0);
 }
+
+#[test]
+fn delete_with_a_page_and_no_layer_selected_deletes_the_page() {
+    let (mut u, ..) = setup();
+    u.app.session.execute("page.add", &json!({})).unwrap();
+    u.app.session.execute("select.none", &json!({})).unwrap();
+    let pages = u.app.session.doc().unwrap().pages.len();
+    let open = u.app.session.page().unwrap();
+    u.app.ui.layers_focus = true;
+    key(&mut u, Key::Delete, false);
+    let doc = u.app.session.doc().unwrap();
+    assert_eq!(doc.pages.len(), pages - 1, "the open page is deleted");
+    assert!(!doc.contains(open));
+}
