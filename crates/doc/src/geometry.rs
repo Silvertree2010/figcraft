@@ -76,10 +76,9 @@ fn hits_node_itself(doc: &Document, id: NodeId, n: &Node, pt: Point, tol: f64, o
     }
 }
 
-/// Whether local point `lp` hits `n` drawn as `path`: `inside` it (counted when it's filled, or
-/// draws nothing at all), or within reach of its outline (its stroke, else the tolerance).
+/// Whether local point `lp` hits `n` drawn as `path`: `inside` it (counted whether or not it's filled), or within reach of its outline (its stroke, else the tolerance).
 fn hits_path(n: &Node, path: &BezPath, lp: Point, tol: f64, inside: bool) -> bool {
-    if inside && (n.fills.iter().any(|f| f.visible) || !n.has_visible_stroke()) {
+    if inside {
         return true;
     }
     // Only a stroke with nothing filled gets the wider band: a filled shape's edge keeps the plain one.

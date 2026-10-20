@@ -105,3 +105,16 @@ fn a_layer_dragged_in_a_group_stays_in_it() {
     drag(&mut s, (225.0, 425.0), (525.0, 125.0));
     assert_eq!(parent(&s, a), Some(frame), "outside a group, a frame takes the drop");
 }
+
+#[test]
+fn an_unselected_stroke_only_shape_drags_from_inside() {
+    let mut s = Session::new();
+    let r = ex(&mut s, "shape.rectangle", json!({"x": 100, "y": 100, "width": 100, "height": 50}));
+    no_snapping(&mut s);
+    s.execute("stroke.add", &json!({})).unwrap();
+    s.execute("fill.remove", &json!({})).unwrap();
+    s.execute("select.none", &json!({})).unwrap();
+    drag(&mut s, (150.0, 125.0), (200.0, 150.0));
+    let b = s.doc().unwrap().world_bounds(r).unwrap();
+    assert_eq!((b.x0, b.y0), (150.0, 125.0), "dragged by the pointer delta");
+}
