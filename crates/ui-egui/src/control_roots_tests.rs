@@ -90,3 +90,23 @@ fn window_captures_are_written_through_the_roots_or_returned() {
     });
     assert!(d.0.join("out/shot.png").is_file() && !d.0.join("outside/shot.png").exists());
 }
+
+#[test]
+fn document_inspect_caps_the_requested_depth() {
+    let (mut app, _d) = confined_app("inspect-depth");
+    let mut parent: Option<Value> = None;
+    for _ in 0..80 {
+        let mut p = json!({"x": 0, "y": 0, "width": 10, "height": 10});
+        if let Some(id) = &parent {
+            p["parent"] = id.clone();
+        }
+        let r = app.session.execute("frame.create", &p).unwrap();
+        parent = Some(r["id"].clone());
+    }
+    let r = handle(&mut app, "document.inspect", json!({"depth": u64::MAX, "allPages": false})).unwrap();
+    fn nesting(v: &Value) -> usize {
+        v["children"].as_array().map_or(0, |c| 1 + c.iter().map(nesting).max().unwrap_or(0))
+    }
+    let n = nesting(&r["pages"][0]);
+    assert!(n <= 64, "inspect nested {n} levels");
+}
