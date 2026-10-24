@@ -92,6 +92,16 @@ fn window_captures_are_written_through_the_roots_or_returned() {
 }
 
 #[test]
+fn ui_input_rejects_non_finite_coordinates() {
+    let (mut app, _d) = confined_app("input");
+    for ev in [json!({"move": [1e300, 5]}), json!({"down": [5, 1e300]}), json!({"scroll": [1e300, 0]})] {
+        let r = handle(&mut app, "ui.input", json!({"events": [ev]}));
+        assert!(r.is_err(), "{ev}: {r:?}");
+    }
+    assert!(app.control_input.iter().all(|e| !matches!(e, egui::Event::PointerMoved(p) if !p.is_finite())));
+}
+
+#[test]
 fn document_inspect_caps_the_requested_depth() {
     let (mut app, _d) = confined_app("inspect-depth");
     let mut parent: Option<Value> = None;
