@@ -3,10 +3,21 @@ use super::load::{ext, file_stem, write};
 use super::open::remember;
 use super::*;
 
-/// Thumbnail PNG of the first page's content (for file browsers / the home screen).
+/// Thumbnail PNG of the frame marked by "Set as thumbnail" (on any page), else of the first page's
+/// content (for file browsers / the home screen).
 pub fn thumbnail(doc: &Document) -> Option<Vec<u8>> {
-    let page = doc.first_page()?;
-    let b = doc.page_content_bounds(page)?;
+    let marked = doc
+        .ids()
+        .find(|&n| doc.node(n).is_some_and(|node| node.plugin_data.contains_key("figcraft.thumbnail")))
+        .and_then(|n| Some((doc.page_of(n)?, doc.world_bounds(n)?)))
+        .filter(|(_, b)| b.width() > 0.0 && b.height() > 0.0);
+    let (page, b) = match marked {
+        Some(m) => m,
+        None => {
+            let page = doc.first_page()?;
+            (page, doc.page_content_bounds(page)?)
+        }
+    };
     let scale = (400.0 / b.width().max(b.height()).max(1.0)).min(2.0);
     let view = figcraft_render::View {
         origin: (b.x0, b.y0),

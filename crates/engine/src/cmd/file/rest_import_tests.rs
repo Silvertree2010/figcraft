@@ -185,3 +185,15 @@ fn open_and_import_rest_json() {
     assert!(crate::components::mirror_issues(doc).is_empty());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn thumbnail_shows_the_frame_set_as_thumbnail() {
+    let mut s = Session::new();
+    let cover = s.execute("frame.create", &json!({"name": "Cover", "x": 0, "y": 600, "width": 100, "height": 100})).unwrap();
+    s.execute("frame.create", &json!({"name": "Wide", "x": 700, "y": 600, "width": 600, "height": 100})).unwrap();
+    s.execute("object.setThumbnail", &json!({"id": cover["id"]})).unwrap();
+    let png = thumbnail(s.doc().unwrap()).unwrap();
+    let w = u32::from_be_bytes(png[16..20].try_into().unwrap());
+    let h = u32::from_be_bytes(png[20..24].try_into().unwrap());
+    assert_eq!(w, h, "square frame, got {w}x{h}");
+}
