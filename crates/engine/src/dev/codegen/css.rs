@@ -226,7 +226,10 @@ fn text_decls(doc: &Document, n: &Node, tx: &figcraft_doc::TextData, t: &mut Tok
             doc,
             n,
             &["fontFamily"],
-            format!("\"{}\"", s.font_family.replace('"', "'").replace('\\', "\\\\").replace("\r\n", "\\A ").replace(['\n', '\r'], "\\A ")),
+            format!(
+                "\"{}\"",
+                s.font_family.replace('\\', "\\\\").replace('"', "\\\"").replace('<', "\\3C ").replace("\r\n", "\\A ").replace(['\n', '\r'], "\\A ")
+            ),
             t,
         ),
     );

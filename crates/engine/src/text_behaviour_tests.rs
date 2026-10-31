@@ -545,4 +545,8 @@ fn css_font_family_escapes_backslash_and_newline() {
     let t = text(&mut s, "abc", json!({"fontFamily": "Foo\nBar"}));
     let css = crate::codegen::css_decls(s.doc().unwrap(), s.doc().unwrap().node(t).unwrap(), &mut Default::default(), (true, true));
     assert!(css.contains(r#"font-family: "Foo\A Bar";"#), "{css}");
+    // A quote stays a quote, and a name can't close the page's <style> block.
+    let t = text(&mut s, "abc", json!({"fontFamily": "Foo\"</style>"}));
+    let css = crate::codegen::css_decls(s.doc().unwrap(), s.doc().unwrap().node(t).unwrap(), &mut Default::default(), (true, true));
+    assert!(css.contains(r#"font-family: "Foo\"\3C /style>";"#), "{css}");
 }
