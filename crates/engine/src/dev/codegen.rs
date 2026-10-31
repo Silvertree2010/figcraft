@@ -195,7 +195,9 @@ pub(crate) fn num(v: f64) -> String {
 
 /// `v` without trailing zeros (6 decimals), for lengths that must convert back to the same pixels.
 fn num6(v: f64) -> String {
-    let r = (v * 1_000_000.0).round() / 1_000_000.0;
+    let scaled = v * 1_000_000.0;
+    // Past the x1e6 overflow every value is whole anyway, so keep it as is.
+    let r = if scaled.is_finite() { scaled.round() / 1_000_000.0 } else { v };
     if r.is_finite() && r != 0.0 { format!("{r}") } else { "0".into() }
 }
 
@@ -467,6 +469,12 @@ mod tests {
             assert_eq!(s, format!("{v:.0}"));
             assert_eq!(s.parse::<f64>(), Ok(v));
         }
+    }
+
+    #[test]
+    fn num6_keeps_finite_values_past_the_x1e6_overflow() {
+        assert_eq!(num6(1e305).parse::<f64>(), Ok(1e305));
+        assert_eq!(num6(0.1234567), "0.123457");
     }
 
     #[test]
